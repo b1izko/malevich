@@ -1,0 +1,2 @@
+# malevich-contracts
+
