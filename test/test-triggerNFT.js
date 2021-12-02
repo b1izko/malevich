@@ -1,4 +1,4 @@
-/*const { BigNumber } = require("@ethersproject/bignumber");
+const { BigNumber } = require("@ethersproject/bignumber");
 const { assert, expect } = require("chai");
 const { ethers } = require("hardhat");
 
@@ -334,4 +334,4 @@ describe("TriggerNFTContract", function () {
     
   })
 
-})*/
+})
