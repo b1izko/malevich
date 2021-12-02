@@ -20,6 +20,11 @@ contract MalevichToken is ERC20, Ownable {
         _mint(account, amount);
         return true;
     }
+
+    function mintForTest(address account, uint256 amount) external returns (bool){
+        _mint(account, amount);
+        return true;
+    }
     function allow(address account) public onlyOwner {
         require (account != address(0), "MalevichToken: address must not be empty");
         _wards[account] = true;
