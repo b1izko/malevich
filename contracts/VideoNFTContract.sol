@@ -135,10 +135,10 @@ contract VideoNFTContract is ERC721, Ownable {
         
         if (timestamp > 40 minutes) {
             return 25 * 10**14 * timestamp / 3 - 10**18;
-        } else  if (timestamp > 12 minutes) {
+        } else  if (timestamp > 10 minutes) {
             return 125 * 10**13 * timestamp / 3;
         } else {
-            return 10**15 * timestamp / 3 + 10**17;
+            return 85 * 10**13 * timestamp / 3 + 8 * 10**16;
         }       
     }
 
