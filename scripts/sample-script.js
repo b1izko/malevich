@@ -8,10 +8,10 @@ async function main() {
   malevichToken = await MalevichToken.deploy();
   console.log("MalevichToken deployed to address:", malevichToken.address);
 
-  triggerNFTContract = await TriggerNFTContract.deploy(malevichToken.address, 123456)
+  triggerNFTContract = await TriggerNFTContract.deploy(malevichToken.address, 1000)
   console.log("TriggerNFTContract deployed to address:", triggerNFTContract.address);
 
-  videoNFTContract = await VideoNFTContract.deploy(malevichToken.address, 5000, 1234567890);
+  videoNFTContract = await VideoNFTContract.deploy(malevichToken.address, 21600, 50, 600);
   console.log("VideoNFTContract deployed to address:", videoNFTContract.address);
 
   await malevichToken.allow(triggerNFTContract.address);

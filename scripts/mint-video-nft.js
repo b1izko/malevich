@@ -12,7 +12,7 @@ const web3 = createAlchemyWeb3(API_URL)
 const contractAddress = CONTRACT_ADDRESS
 const videoNFTContract = new web3.eth.Contract(contract.abi, contractAddress)
 
-async function mintVideoNFT(tokenURI) {
+async function mintVideoNFT(tokenURI, auctionStartTimestamp) {
     const nonce = await web3.eth.getTransactionCount(PUBLIC_KEY, "latest") //get latest nonce
 
     //the transaction
@@ -21,7 +21,7 @@ async function mintVideoNFT(tokenURI) {
         to: contractAddress,
         nonce: nonce,
         gas: 1500000,
-        data: videoNFTContract.methods.mint(PUBLIC_KEY, tokenURI).encodeABI(),
+        data: videoNFTContract.methods.mintToken(PUBLIC_KEY, tokenURI, auctionStartTimestamp).encodeABI(),
     }
   
     const signPromise = web3.eth.accounts.signTransaction(tx, PRIVATE_KEY)

@@ -51,7 +51,7 @@ describe("TriggerNFTContract", function () {
         await expect(triggerNFTContract.setTokenWord(getRandomInt(100), ethers.utils.formatBytes32String("hello_world"))).
                 to.be.revertedWith('TriggerNFTContract: word query for nonexistent token');
 
-        await expect(triggerNFTContract.getTokenWord(getRandomInt(100))).
+        await expect(triggerNFTContract.tokenWord(getRandomInt(100))).
                 to.be.revertedWith('TriggerNFTContract: word query for nonexistent token');
 
         let tokenId = await triggerNFTContract.callStatic.mintToken(ethers.utils.formatBytes32String("hello_world"));
@@ -59,7 +59,7 @@ describe("TriggerNFTContract", function () {
               to.emit(triggerNFTContract, 'Transfer').
               withArgs(ethers.constants.AddressZero, triggerNFTContract.address, tokenId);
               
-        expect(await triggerNFTContract.getTokenWord(tokenId)).
+        expect(await triggerNFTContract.tokenWord(tokenId)).
                 to.be.equal(ethers.utils.formatBytes32String("hello_world"));
     })
 
@@ -85,7 +85,7 @@ describe("TriggerNFTContract", function () {
             fakeTokensId[counter] = counter + 1;
         }
 
-        await expect(triggerNFTContract.createTrigger(BigNumber.from(9876543210), BigNumber.from(1234567890), fakeTokensId)).
+        await expect(triggerNFTContract.createTrigger(fakeTokensId, BigNumber.from(9876543210))).
                 to.be.revertedWith('TriggerNFTContract: invalid token ID');
 
         let tokensId = new Array(tokenAmount);
@@ -99,10 +99,10 @@ describe("TriggerNFTContract", function () {
 
 
 
-        let triggerId = await triggerNFTContract.callStatic.createTrigger(BigNumber.from(1234567890), BigNumber.from(1234567890), tokensId);
-        await expect(triggerNFTContract.createTrigger(BigNumber.from(1234567890), BigNumber.from(1234567890), tokensId)).
+        let triggerId = await triggerNFTContract.callStatic.createTrigger(tokensId, BigNumber.from(1234567890));
+        await expect(triggerNFTContract.createTrigger(tokensId, BigNumber.from(1234567890))).
                 to.emit(triggerNFTContract, 'CreateTrigger').
-                withArgs(triggerId, tokenAmount);
+                withArgs(triggerId, tokenAmount, BigNumber.from(1234567890));
     })
 
     it("Edit Trigger", async() => {  
@@ -116,13 +116,13 @@ describe("TriggerNFTContract", function () {
             tokensId[counter] = tokenId;
         }
 
-        await expect(triggerNFTContract.editTrigger(getRandomInt(100), BigNumber.from(9876543210), BigNumber.from(1234567890), tokensId)).
+        await expect(triggerNFTContract.editTrigger(getRandomInt(100), tokensId, BigNumber.from(9876543210))).
                 to.be.revertedWith('TriggerNFTContract: trigger query for nonexistent token');
 
-        let triggerId = await triggerNFTContract.callStatic.createTrigger(BigNumber.from(1234567890), BigNumber.from(1234567890), tokensId);
-        await expect(triggerNFTContract.createTrigger(BigNumber.from(1234567890), BigNumber.from(9876543210), tokensId)).
+        let triggerId = await triggerNFTContract.callStatic.createTrigger(tokensId, BigNumber.from(1234567890));
+        await expect(triggerNFTContract.createTrigger(tokensId, BigNumber.from(1234567890))).
                 to.emit(triggerNFTContract, 'CreateTrigger').
-                withArgs(triggerId, tokenAmount);
+                withArgs(triggerId, tokenAmount, BigNumber.from(1234567890));
 
         let newTokenAmount = getRandomInt(100);
         newTokensId = new Array(newTokenAmount);
@@ -134,15 +134,15 @@ describe("TriggerNFTContract", function () {
             newTokensId[counter] = tokenId;
         }
 
-        await expect(triggerNFTContract.editTrigger(triggerId + getRandomInt(100), BigNumber.from(9876543210), BigNumber.from(1234567890), newTokensId)).
+        await expect(triggerNFTContract.editTrigger(triggerId + getRandomInt(100), newTokensId, BigNumber.from(9876543210))).
                 to.be.revertedWith('TriggerNFTContract: trigger query for nonexistent token');
 
-        await expect(triggerNFTContract.editTrigger(triggerId, BigNumber.from(9876543210), BigNumber.from(1234567890), newTokensId)).
+        await expect(triggerNFTContract.editTrigger(triggerId, newTokensId, BigNumber.from(9876543210))).
                 to.emit(triggerNFTContract, 'EditTrigger').
-                withArgs(triggerId, newTokenAmount);
+                withArgs(triggerId, newTokenAmount, BigNumber.from(9876543210));
     })
     
-    it("Buy token for Malevich", async() => {  
+    it("Buy token", async() => {  
         let tokenAmount = getRandomInt(100);
         let tokensId = new Array(tokenAmount);
         for (counter = 0; counter < tokenAmount; counter++) {
@@ -153,65 +153,29 @@ describe("TriggerNFTContract", function () {
             tokensId[counter] = tokenId;
         }
 
-        expect(await triggerNFTContract.callStatic.buyTokenForMalevich(getRandomInt(tokenAmount))).
+        expect(await triggerNFTContract.callStatic.buyToken(getRandomInt(tokenAmount))).
             to.be.false;
 
-        await expect(triggerNFTContract.getTokenPriceForMalevich(getRandomInt(tokenAmount))).
+        await expect(triggerNFTContract.getTokenPrice(getRandomInt(tokenAmount))).
             to.be.revertedWith('TriggerNFTContract: token is not associated with any trigger');
 
-        let triggerId = await triggerNFTContract.callStatic.createTrigger(BigNumber.from(1234567890), BigNumber.from(9876543210), tokensId);
-        await expect(triggerNFTContract.createTrigger(BigNumber.from(1234567890), BigNumber.from(9876543210), tokensId)).
+        let triggerId = await triggerNFTContract.callStatic.createTrigger(tokensId, BigNumber.from(1234567890));
+        await expect(triggerNFTContract.createTrigger(tokensId, BigNumber.from(1234567890))).
                 to.emit(triggerNFTContract, 'CreateTrigger').
-                withArgs(triggerId, tokenAmount);
+                withArgs(triggerId, tokenAmount, BigNumber.from(1234567890));
         
         let purchasedToken = getRandomInt(tokenAmount);
-        let tokenPrice = await triggerNFTContract.getTokenPriceForMalevich(purchasedToken);
+        let tokenPrice = await triggerNFTContract.getTokenPrice(purchasedToken);
         
         await malevichToken.mint(alice.address, tokenPrice);
 
         await malevichToken.connect(alice).approve(triggerNFTContract.address, tokenPrice);
 
-        await expect(triggerNFTContract.connect(alice).buyTokenForMalevich(purchasedToken)).
+        await expect(triggerNFTContract.connect(alice).buyToken(purchasedToken)).
                 to.emit(triggerNFTContract, 'BuyToken').
                 withArgs(purchasedToken, alice.address);
         
-        await expect(triggerNFTContract.connect(alice).buyTokenForMalevich(purchasedToken)).
-                to.be.revertedWith('TriggerNFTContract: token was sold');
-    })
-
-    it("Buy token for ETH", async() => {  
-        let tokenAmount = getRandomInt(100);
-        let tokensId = new Array(tokenAmount);
-        for (counter = 0; counter < tokenAmount; counter++) {
-            let tokenId = await triggerNFTContract.callStatic.mintToken(ethers.utils.formatBytes32String("token #" + counter));
-            await expect(triggerNFTContract.mintToken(ethers.utils.formatBytes32String("token #" + counter))).
-                to.emit(triggerNFTContract, 'Transfer').
-                withArgs(ethers.constants.AddressZero, triggerNFTContract.address, tokenId);
-            tokensId[counter] = tokenId;
-        }
-
-        expect(await triggerNFTContract.callStatic.buyTokenForETH(getRandomInt(tokenAmount), {value: 9876543210})).
-            to.be.false;
-
-        await expect(triggerNFTContract.getTokenPriceForETH(getRandomInt(tokenAmount))).
-            to.be.revertedWith('TriggerNFTContract: token is not associated with any trigger');
-
-        let triggerId = await triggerNFTContract.callStatic.createTrigger(BigNumber.from(1234567890), BigNumber.from(9876543210), tokensId);
-        await expect(triggerNFTContract.createTrigger(BigNumber.from(1234567890), BigNumber.from(9876543210), tokensId)).
-                to.emit(triggerNFTContract, 'CreateTrigger').
-                withArgs(triggerId, tokenAmount);
-
-        let purchasedToken = getRandomInt(tokenAmount);
-        let tokenPrice = await triggerNFTContract.getTokenPriceForETH(purchasedToken);
-        
-        await expect(triggerNFTContract.connect(alice).buyTokenForETH(purchasedToken, {value: tokenPrice - getRandomInt(tokenPrice)})).
-                to.be.revertedWith('TriggerNFTContract: insufficient funds');
-
-        await expect(triggerNFTContract.connect(alice).buyTokenForETH(purchasedToken, {value: tokenPrice})).
-                to.emit(triggerNFTContract, 'BuyToken').
-                withArgs(purchasedToken, alice.address);
-        
-        await expect(triggerNFTContract.connect(alice).buyTokenForETH(purchasedToken, {value: tokenPrice})).
+        await expect(triggerNFTContract.connect(alice).buyToken(purchasedToken)).
                 to.be.revertedWith('TriggerNFTContract: token was sold');
     })
     
@@ -232,10 +196,10 @@ describe("TriggerNFTContract", function () {
             tokensId[counter] = tokenId;
         }
 
-        let triggerId = await triggerNFTContract.callStatic.createTrigger(BigNumber.from(1234567890), BigNumber.from(9876543210), tokensId);
-        await expect(triggerNFTContract.createTrigger(BigNumber.from(1234567890), BigNumber.from(9876543210), tokensId)).
+        let triggerId = await triggerNFTContract.callStatic.createTrigger(tokensId, BigNumber.from(1234567890));
+        await expect(triggerNFTContract.createTrigger(tokensId, BigNumber.from(1234567890))).
                 to.emit(triggerNFTContract, 'CreateTrigger').
-                withArgs(triggerId, tokenAmount);
+                withArgs(triggerId, tokenAmount, BigNumber.from(1234567890));
         
         expect(await triggerNFTContract.isTriggerCompleted(triggerId)).
                 to.be.false;
@@ -259,15 +223,19 @@ describe("TriggerNFTContract", function () {
             tokensId[counter] = tokenId;
         }
 
-        let triggerId = await triggerNFTContract.callStatic.createTrigger(BigNumber.from(1234567890), BigNumber.from(1234567890), tokensId);
-        await expect(triggerNFTContract.createTrigger(BigNumber.from(1234567890), BigNumber.from(1234567890), tokensId)).
+        let triggerId = await triggerNFTContract.callStatic.createTrigger(tokensId, BigNumber.from(1234567890));
+        await expect(triggerNFTContract.createTrigger(tokensId, BigNumber.from(1234567890))).
                 to.emit(triggerNFTContract, 'CreateTrigger').
-                withArgs(triggerId, tokenAmount);
+                withArgs(triggerId, tokenAmount, BigNumber.from(1234567890));
                 
         let purchasedToken = getRandomInt(tokenAmount);
-        let tokenPrice = await triggerNFTContract.getTokenPriceForETH(purchasedToken);
+        let tokenPrice = await triggerNFTContract.getTokenPrice(purchasedToken);
         
-        await expect(triggerNFTContract.connect(alice).buyTokenForETH(purchasedToken, {value: tokenPrice})).
+        await malevichToken.mint(alice.address, tokenPrice);
+
+        await malevichToken.connect(alice).approve(triggerNFTContract.address, tokenPrice);
+
+        await expect(triggerNFTContract.connect(alice).buyToken(purchasedToken)).
                 to.emit(triggerNFTContract, 'BuyToken').
                 withArgs(purchasedToken, alice.address);
         
@@ -302,15 +270,19 @@ describe("TriggerNFTContract", function () {
             tokensId[counter] = tokenId;
         }
 
-        let triggerId = await triggerNFTContract.callStatic.createTrigger(BigNumber.from(1234567890), BigNumber.from(1234567890), tokensId);
-        await expect(triggerNFTContract.createTrigger(BigNumber.from(1234567890), BigNumber.from(1234567890), tokensId)).
+        let triggerId = await triggerNFTContract.callStatic.createTrigger(tokensId, BigNumber.from(1234567890));
+        await expect(triggerNFTContract.createTrigger(tokensId, BigNumber.from(1234567890))).
                 to.emit(triggerNFTContract, 'CreateTrigger').
-                withArgs(triggerId, tokenAmount);
+                withArgs(triggerId, tokenAmount, BigNumber.from(1234567890));
                 
         let purchasedToken = getRandomInt(tokenAmount);
-        let tokenPrice = await triggerNFTContract.getTokenPriceForETH(purchasedToken);
+        let tokenPrice = await triggerNFTContract.getTokenPrice(purchasedToken);
         
-        await expect(triggerNFTContract.connect(alice).buyTokenForETH(purchasedToken, {value: tokenPrice})).
+        await malevichToken.mint(alice.address, tokenPrice);
+
+        await malevichToken.connect(alice).approve(triggerNFTContract.address, tokenPrice);
+
+        await expect(triggerNFTContract.connect(alice).buyToken(purchasedToken)).
                 to.emit(triggerNFTContract, 'BuyToken').
                 withArgs(purchasedToken, alice.address);
         

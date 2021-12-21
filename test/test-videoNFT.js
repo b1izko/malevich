@@ -25,7 +25,7 @@ describe("VideoNFTContract", function () {
     const VideoNFTContract = await ethers.getContractFactory("VideoNFTContract");
 
     malevichToken = await MalevichToken.deploy();
-    videoNFTContract = await VideoNFTContract.deploy(malevichToken.address, 1800, 1234567890);
+    videoNFTContract = await VideoNFTContract.deploy(malevichToken.address, 1800, 1234567890, 600);
 
     await malevichToken.allow(videoNFTContract.address);
   })
@@ -33,7 +33,7 @@ describe("VideoNFTContract", function () {
   describe("Testing constructor", function () {
     it("Constructor", async() => { 
       const VideoNFTContract = await ethers.getContractFactory("VideoNFTContract"); 
-      await expect(VideoNFTContract.deploy(ethers.constants.AddressZero, 1800, 1234567890)).
+      await expect(VideoNFTContract.deploy(ethers.constants.AddressZero, 1800, 1234567890, 600)).
             to.be.revertedWith('VideoNFTContract: address must not be empty'); 
     })
   })
@@ -70,17 +70,21 @@ describe("VideoNFTContract", function () {
 
       let timestamp = new Date('Jan 1, 19 00:00:00 GMT+00:00');
       let triggerMoment = Math.floor(timestamp.getTime() / 1000);
+      let auctionTime = 7200;
+      let startPrice = BigNumber.from(10).pow(18).mul(5);
+      let endPrice = BigNumber.from(10).pow(16).mul(8);
 
-      await expect(videoNFTContract.createEdition(tokensId, triggerMoment)).
+      await expect(videoNFTContract.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice)).
             to.be.revertedWith('VideoNFTContract: timestamp cannot be less than the current time');
 
       timestamp = new Date('Jan 1, 22 00:00:00 GMT+00:00');
       triggerMoment = Math.floor(timestamp.getTime() / 1000);
 
-      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment);
-      await expect(videoNFTContract.createEdition(tokensId, triggerMoment)).
+
+      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice);
+      await expect(videoNFTContract.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice)).
                 to.emit(videoNFTContract, 'CreateEdition').
-                withArgs(editionId, triggerMoment);
+                withArgs(editionId, triggerMoment, auctionTime, startPrice, endPrice);
 
       let {0: _tokens, 1: _triggerMomentTimestamp, 2: _lastUpdateTimestamp} = await videoNFTContract.getEdition(editionId);
       expect(_triggerMomentTimestamp).to.equal(BigNumber.from(triggerMoment)); 
@@ -135,11 +139,14 @@ describe("VideoNFTContract", function () {
 
       let timestamp = new Date('Jan 1, 22 00:00:00 GMT+00:00');
       let triggerMoment = Math.floor(timestamp.getTime() / 1000);
+      let auctionTime = 7200;
+      let startPrice = BigNumber.from(10).pow(18).mul(5);
+      let endPrice = BigNumber.from(10).pow(16).mul(8);
 
-      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment);
-      await expect(videoNFTContract.createEdition(tokensId, triggerMoment)).
+      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice);
+      await expect(videoNFTContract.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice)).
                 to.emit(videoNFTContract, 'CreateEdition').
-                withArgs(editionId, triggerMoment);
+                withArgs(editionId, triggerMoment, auctionTime, startPrice, endPrice);
 
       increaseTime(300);
       let purchasedToken = getRandomInt(tokenAmount);
@@ -190,12 +197,14 @@ describe("VideoNFTContract", function () {
 
       let timestamp = new Date('Jan 1, 22 00:00:00 GMT+00:00');
       let triggerMoment = Math.floor(timestamp.getTime() / 1000);
+      let auctionTime = 7200;
+      let startPrice = BigNumber.from(10).pow(18).mul(5);
+      let endPrice = BigNumber.from(10).pow(16).mul(8);
 
-      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment);
-      await expect(videoNFTContract.createEdition(tokensId, triggerMoment)).
+      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice);
+      await expect(videoNFTContract.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice)).
                 to.emit(videoNFTContract, 'CreateEdition').
-                withArgs(editionId, triggerMoment);
-
+                withArgs(editionId, triggerMoment, auctionTime, startPrice, endPrice);
       increaseTime(300);
       let purchasedToken = getRandomInt(tokenAmount);
       
@@ -246,11 +255,14 @@ describe("VideoNFTContract", function () {
       }
 
       let triggerMoment = latestBlock.timestamp + 4000;
+      let auctionTime = 7200;
+      let startPrice = BigNumber.from(10).pow(18).mul(5);
+      let endPrice = BigNumber.from(10).pow(16).mul(8);
 
-      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment);
-      await expect(videoNFTContract.createEdition(tokensId, triggerMoment)).
+      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice);
+      await expect(videoNFTContract.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice)).
                 to.emit(videoNFTContract, 'CreateEdition').
-                withArgs(editionId, triggerMoment);
+                withArgs(editionId, triggerMoment, auctionTime, startPrice, endPrice);
 
       increaseTime(300);
       let purchasedToken = getRandomInt(tokenAmount);
@@ -394,11 +406,14 @@ describe("VideoNFTContract", function () {
 
       let timestamp = new Date('Jan 1, 22 00:00:00 GMT+00:00');
       let triggerMoment = Math.floor(timestamp.getTime() / 1000);
+      let auctionTime = 7200;
+      let startPrice = BigNumber.from(10).pow(18).mul(5);
+      let endPrice = BigNumber.from(10).pow(16).mul(8);
 
-      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment);
-      await expect(videoNFTContract.createEdition(tokensId, triggerMoment)).
+      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice);
+      await expect(videoNFTContract.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice)).
                 to.emit(videoNFTContract, 'CreateEdition').
-                withArgs(editionId, triggerMoment);
+                withArgs(editionId, triggerMoment, auctionTime, startPrice, endPrice);
 
       increaseTime(300);
       let purchasedToken = getRandomInt(tokenAmount);
@@ -423,6 +438,12 @@ describe("VideoNFTContract", function () {
     it("getApproved", async() => {      
       await expect(videoNFTContract.getApproved(BigNumber.from(10))).
             to.be.revertedWith('VideoNFTContract: approved query for nonexistent token');
+    })
+
+    it("Price Update Time", async() => {      
+      await videoNFTContract.setPriceUpdateTime(BigNumber.from(55555));
+      expect(await videoNFTContract.getPriceUpdateTime()).
+            to.equal(BigNumber.from(55555));
     })
 
     it("Quant Period", async() => {      
@@ -470,11 +491,14 @@ describe("VideoNFTContract", function () {
 
       let timestamp = new Date('Jan 1, 22 00:00:00 GMT+00:00');
       let triggerMoment = Math.floor(timestamp.getTime() / 1000);
+      let auctionTime = 7200;
+      let startPrice = BigNumber.from(10).pow(18).mul(5);
+      let endPrice = BigNumber.from(10).pow(16).mul(8);
 
-      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment);
-      await expect(videoNFTContract.createEdition(tokensId, triggerMoment)).
+      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice);
+      await expect(videoNFTContract.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice)).
                 to.emit(videoNFTContract, 'CreateEdition').
-                withArgs(editionId, triggerMoment);
+                withArgs(editionId, triggerMoment, auctionTime, startPrice, endPrice);
 
       let purchasedToken = getRandomInt(tokenAmount);
 
@@ -513,11 +537,14 @@ describe("VideoNFTContract", function () {
 
       let timestamp = new Date('Jan 1, 22 00:00:00 GMT+00:00');
       let triggerMoment = Math.floor(timestamp.getTime() / 1000);
+      let auctionTime = 7200;
+      let startPrice = BigNumber.from(10).pow(18).mul(5);
+      let endPrice = BigNumber.from(10).pow(16).mul(8);
 
-      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment);
-      await expect(videoNFTContract.createEdition(tokensId, triggerMoment)).
+      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice);
+      await expect(videoNFTContract.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice)).
                 to.emit(videoNFTContract, 'CreateEdition').
-                withArgs(editionId, triggerMoment);
+                withArgs(editionId, triggerMoment, auctionTime, startPrice, endPrice);
 
       increaseTime(300);
 
@@ -550,14 +577,17 @@ describe("VideoNFTContract", function () {
 
       let timestamp = new Date('Jan 1, 22 00:00:00 GMT+00:00');
       let triggerMoment = Math.floor(timestamp.getTime() / 1000);
+      let auctionTime = 7200;
+      let startPrice = BigNumber.from(10).pow(18).mul(5);
+      let endPrice = BigNumber.from(10).pow(16).mul(8);
 
-      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment);
-      await expect(videoNFTContract.createEdition(tokensId, triggerMoment)).
+      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice);
+      await expect(videoNFTContract.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice)).
                 to.emit(videoNFTContract, 'CreateEdition').
-                withArgs(editionId, triggerMoment);
+                withArgs(editionId, triggerMoment, auctionTime, startPrice, endPrice);
 
       
-      await videoNFTContract.updateTriggerTime(editionId, triggerMoment + 1000);
+      await videoNFTContract.setTriggerTime(editionId, triggerMoment + 1000);
       let editedTokensId = new Array(tokenAmount);
       for (counter = 0; counter < tokenAmount; counter++) {
             let tokenId = await videoNFTContract.callStatic.mintToken("edited token #" + counter, auctionTimestamp + 600);
@@ -566,25 +596,26 @@ describe("VideoNFTContract", function () {
                   withArgs(ethers.constants.AddressZero, videoNFTContract.address, tokenId);
             editedTokensId[counter] = tokenId;
       }
-
+      
       timestamp = new Date('Jan 1, 19 00:00:00 GMT+00:00');
       triggerMoment = Math.floor(timestamp.getTime() / 1000);
 
-      await expect(videoNFTContract.updateTriggerTime(editionId, triggerMoment)).
+      await expect(videoNFTContract.setTriggerTime(editionId, triggerMoment)).
             to.be.revertedWith('VideoNFTContract: timestamp cannot be less than the current time');
 
-      await expect(videoNFTContract.editEdition(editionId, editedTokensId, triggerMoment)).
+      await expect(videoNFTContract.editEdition(editionId, editedTokensId, triggerMoment, auctionTime, startPrice, endPrice)).
             to.be.revertedWith('VideoNFTContract: timestamp cannot be less than the current time');
-
+      
       timestamp = new Date('Jan 1, 23 00:00:00 GMT+00:00');
       triggerMoment = Math.floor(timestamp.getTime() / 1000);
-
-      await videoNFTContract.updateTriggerTime(editionId, triggerMoment);
-
-      editionId = await videoNFTContract.callStatic.editEdition(editionId, editedTokensId, triggerMoment);
-      await expect(videoNFTContract.editEdition(editionId, editedTokensId, triggerMoment)).
+      auctionTime = 3600;
+      startPrice = BigNumber.from(10).pow(17).mul(25);
+      endPrice = BigNumber.from(10).pow(16).mul(8);
+      await videoNFTContract.setTriggerTime(editionId, triggerMoment);
+            
+      await expect(videoNFTContract.editEdition(editionId, editedTokensId, triggerMoment, auctionTime, startPrice, endPrice)).
                 to.emit(videoNFTContract, 'EditEdition').
-                withArgs(editionId, triggerMoment);
+                withArgs(editionId, triggerMoment, auctionTime, startPrice, endPrice);
     })
 
     it("getTokenPrice", async() => { 
@@ -603,41 +634,58 @@ describe("VideoNFTContract", function () {
 
       let timestamp = new Date('Jan 1, 22 00:00:00 GMT+00:00');
       let triggerMoment = Math.floor(timestamp.getTime() / 1000);
+      let auctionTime = 7200;
+      let startPrice = BigNumber.from(10).pow(18).mul(5);
+      let endPrice = BigNumber.from(10).pow(16).mul(8);
 
-      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment);
-      await expect(videoNFTContract.createEdition(tokensId, triggerMoment)).
+      let editionId = await videoNFTContract.callStatic.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice);
+      await expect(videoNFTContract.createEdition(tokensId, triggerMoment, auctionTime, startPrice, endPrice)).
                 to.emit(videoNFTContract, 'CreateEdition').
-                withArgs(editionId, triggerMoment);
+                withArgs(editionId, triggerMoment, auctionTime, startPrice, endPrice);
 
       let purchasedToken = getRandomInt(tokenAmount);
       
+      
+      //``````````````````````````````````````````````
+      //                FOR CHECK PRICE
+      //``````````````````````````````````````````````
+      
+      //increaseTime(300);
+      //let priceUpdateTime = BigNumber.from(await videoNFTContract.getPriceUpdateTime()).toNumber();
+      //console.log("Price Update Time: ", priceUpdateTime);
+      //for (timer = 0; timer < auctionTime; timer = timer + priceUpdateTime) {
+      //      console.log("Price: ", BigNumber.from(await videoNFTContract.getTokenPrice(purchasedToken)).toString());
+      //      increaseTime(priceUpdateTime);
+      //}
+
       increaseTime(300);
       expect(await videoNFTContract.getTokenPrice(purchasedToken)).
-            to.equal(BigNumber.from(10).pow(17).mul(45));
+            to.within(BigNumber.from(10).pow(17).mul(44), BigNumber.from(10).pow(17).mul(46));
 
       increaseTime(600);
       expect(await videoNFTContract.getTokenPrice(purchasedToken)).
-            to.equal(BigNumber.from(10).pow(17).mul(40));
+            to.within(BigNumber.from(10).pow(17).mul(39), BigNumber.from(10).pow(17).mul(40));      
       
       increaseTime(4200);
       expect(await videoNFTContract.getTokenPrice(purchasedToken)).
-            to.equal(BigNumber.from(10).pow(16).mul(75));
+            to.within(BigNumber.from(10).pow(16).mul(50), BigNumber.from(10).pow(16).mul(60));
+
       
       increaseTime(600);
       expect(await videoNFTContract.getTokenPrice(purchasedToken)).
-            to.equal(BigNumber.from(10).pow(16).mul(50));
+            to.within(BigNumber.from(10).pow(16).mul(40), BigNumber.from(10).pow(16).mul(60));
       
       increaseTime(600);
       expect(await videoNFTContract.getTokenPrice(purchasedToken)).
-            to.equal(BigNumber.from(10).pow(16).mul(30));
+            to.within(BigNumber.from(10).pow(16).mul(20), BigNumber.from(10).pow(16).mul(30));    
       
       increaseTime(600);
       expect(await videoNFTContract.getTokenPrice(purchasedToken)).
-            to.equal(BigNumber.from(10).pow(16).mul(10));
+            to.within(BigNumber.from(10).pow(16).mul(5), BigNumber.from(10).pow(16).mul(15));     
       
       increaseTime(600);
       expect(await videoNFTContract.getTokenPrice(purchasedToken)).
-            to.equal(BigNumber.from(10).pow(16).mul(10));
+            to.equal(BigNumber.from(10).pow(16).mul(8));
     })
   })
 

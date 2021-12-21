@@ -12,7 +12,6 @@ contract TriggerNFTContract is ERC721, Ownable {
     struct Trigger {
         bool isQuizzeCompleted;
         uint256 tokenPrice;
-        uint256 tokenPriceETH;
         uint256 [] tokens;
     }
 
@@ -25,36 +24,16 @@ contract TriggerNFTContract is ERC721, Ownable {
 
     uint256 public rewardPerToken;
 
-    event CreateTrigger(uint256 triggerId, uint256 tokenAmount);
-    event EditTrigger(uint256 triggerId, uint256 tokenAmount);
+    event CreateTrigger(uint256 triggerId, uint256 tokenAmount, uint256 tokenPrice);
+    event EditTrigger(uint256 triggerId, uint256 tokenAmount, uint256 tokenPrice);
     event BuyToken(uint256 tokenId, address purchaser);
 
-    constructor(address tokenAddress, uint256 _rewardPerToken) public ERC721("TriggerNFTContract", "TNFT") {
+    constructor(address tokenAddress, uint256 _rewardPerToken) ERC721("TriggerNFTContract", "TNFT") {
         require(tokenAddress != address(0), "TriggerNFTContract: address must not be empty");
         rewardToken = MalevichToken(tokenAddress);
         rewardPerToken = _rewardPerToken;
     }
 
-    function mintToken(bytes32 tokenWord) public onlyOwner returns (uint256) {
-        _tokenIds.increment();
-
-        uint256 newItemId = _tokenIds.current();
-        _mint(address(this), newItemId);
-        setTokenWord(newItemId, tokenWord);
-
-        return newItemId;
-    }
-
-    function getTokenWord(uint256 tokenId) public view onlyOwner returns (bytes32) {
-        require(_exists(tokenId), "TriggerNFTContract: word query for nonexistent token");
-        return _words[tokenId];
-    }
-
-    function setTokenWord(uint256 tokenId, bytes32 tokenWord) public onlyOwner {
-        require(_exists(tokenId), "TriggerNFTContract: word query for nonexistent token");
-        _words[tokenId] = tokenWord;
-    }
-    
     function getRewardPerToken() public view returns (uint256) {
         return rewardPerToken;
     }
@@ -62,30 +41,49 @@ contract TriggerNFTContract is ERC721, Ownable {
         rewardPerToken = _rewardPerToken;
     }
 
-    function createTrigger(uint256 _tokenPrice, uint256 _tokenPriceETH, uint256[] memory _tokens) public onlyOwner returns (uint256) {
+    function mintToken(bytes32 _tokenWord) public onlyOwner returns (uint256) {
+        _tokenIds.increment();
+
+        uint256 newItemId = _tokenIds.current();
+        _mint(address(this), newItemId);
+        setTokenWord(newItemId, _tokenWord);
+
+        return newItemId;
+    }
+
+    function tokenWord(uint256 tokenId) public view onlyOwner returns (bytes32) {
+        require(_exists(tokenId), "TriggerNFTContract: word query for nonexistent token");
+        return _words[tokenId];
+    }
+
+    function setTokenWord(uint256 tokenId, bytes32 _tokenWord) public onlyOwner {
+        require(_exists(tokenId), "TriggerNFTContract: word query for nonexistent token");
+        _words[tokenId] = _tokenWord;
+    }
+    
+
+    function createTrigger(uint256[] memory _tokens, uint256 _tokenPrice) public onlyOwner returns (uint256) {
         _checkTokens(_tokens);
 
         _triggerIds.increment();
         uint256 newTriggerId = _triggerIds.current();
 
         _triggers[newTriggerId].tokenPrice = _tokenPrice;
-        _triggers[newTriggerId].tokenPriceETH = _tokenPriceETH;
         _triggers[newTriggerId].tokens = _tokens;
 
-        emit CreateTrigger(newTriggerId, _tokens.length); 
+        emit CreateTrigger(newTriggerId, _tokens.length, _tokenPrice); 
         
         return newTriggerId;
     }
 
-    function editTrigger(uint256 _triggerId, uint256 _tokenPrice, uint256 _tokenPriceETH, uint256[] memory _tokens) public onlyOwner {
+    function editTrigger(uint256 _triggerId, uint256[] memory _tokens, uint256 _tokenPrice) public onlyOwner {
         require(_triggerId <= _triggerIds.current(), "TriggerNFTContract: trigger query for nonexistent token");
         _checkTokens(_tokens);
         
         _triggers[_triggerId].tokenPrice = _tokenPrice;
-        _triggers[_triggerId].tokenPriceETH = _tokenPriceETH;
         _triggers[_triggerId].tokens = _tokens;
 
-        emit EditTrigger(_triggerId, _tokens.length); 
+        emit EditTrigger(_triggerId, _tokens.length, _tokenPrice); 
     }
 
     function isTriggerCompleted(uint256 triggerId) public view returns (bool) {
@@ -98,28 +96,12 @@ contract TriggerNFTContract is ERC721, Ownable {
         _triggers[triggerId].isQuizzeCompleted = true;
     }
 
-    function buyTokenForETH(uint256 tokenId) public payable returns (bool) {
+    function buyToken(uint256 tokenId) public returns (bool) {
         require(ownerOf(tokenId) == address(this), "TriggerNFTContract: token was sold");
-
-        (uint256 triggerId, bool  ok) = triggerByToken(tokenId); 
-        if (!ok) return false;
- 
-        require (msg.value == _triggers[triggerId].tokenPriceETH, "TriggerNFTContract: insufficient funds");
-
-        _transfer(address(this), _msgSender(), tokenId);
-        
-        emit BuyToken(tokenId, _msgSender());
-        return true;
-    }
-
-    function buyTokenForMalevich(uint256 tokenId) public returns (bool) {
-        require(ownerOf(tokenId) == address(this), "TriggerNFTContract: token was sold");
-
         (uint256 triggerId, bool  ok) = triggerByToken(tokenId); 
         if (!ok) return false;
         
         rewardToken.transferFrom(_msgSender(), address(this), _triggers[triggerId].tokenPrice);
-
         _transfer(address(this), _msgSender(), tokenId);
 
         emit BuyToken(tokenId, _msgSender()); 
@@ -136,13 +118,7 @@ contract TriggerNFTContract is ERC721, Ownable {
         return (0, false);
     }
 
-    function getTokenPriceForETH(uint256 tokenId) public view returns (uint256){
-        (uint256 triggerId, bool  ok) = triggerByToken(tokenId); 
-        require (ok, "TriggerNFTContract: token is not associated with any trigger");
-        return _triggers[triggerId].tokenPriceETH;
-    }
-
-    function getTokenPriceForMalevich(uint256 tokenId) public view returns (uint256){
+    function getTokenPrice(uint256 tokenId) public view returns (uint256){
         (uint256 triggerId, bool  ok) = triggerByToken(tokenId); 
         require (ok, "TriggerNFTContract: token is not associated with any trigger");
         return _triggers[triggerId].tokenPrice;
@@ -168,6 +144,10 @@ contract TriggerNFTContract is ERC721, Ownable {
         for (uint256 counter = 0; counter < _tokens.length; counter++){
             require(_exists(_tokens[counter]), "TriggerNFTContract: invalid token ID");
         }
+    }
+
+    function withdrawMalevich(address recipient, uint256 amount) public onlyOwner {
+        rewardToken.transfer(recipient, amount);
     }
 
 }

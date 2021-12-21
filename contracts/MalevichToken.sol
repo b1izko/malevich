@@ -12,7 +12,7 @@ contract MalevichToken is ERC20, Ownable {
         require(owner() == _msgSender() || _wards[msg.sender], "MalevichToken: caller is not the minter");
         _;
     }
-    constructor() public ERC20("MalevichToken", "MTN") {
+    constructor() ERC20("MalevichToken", "MTN") {
         
     }
 
@@ -21,16 +21,12 @@ contract MalevichToken is ERC20, Ownable {
         return true;
     }
 
-    function mintForTest(address account, uint256 amount) external returns (bool){
-        _mint(account, amount);
-        return true;
-    }
-    function allow(address account) public onlyOwner {
+    function allow(address account) external onlyOwner {
         require (account != address(0), "MalevichToken: address must not be empty");
         _wards[account] = true;
     }
 
-    function deny(address account) public onlyOwner {
+    function deny(address account) external onlyOwner {
         require (account != address(0), "MalevichToken: address must not be empty");
         _wards[account] = false;
     }

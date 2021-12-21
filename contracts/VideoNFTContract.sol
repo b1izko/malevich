@@ -6,8 +6,10 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./MalevichToken.sol";
 
+
 // For debugging only
 import "hardhat/console.sol";
+
 
 contract VideoNFTContract is ERC721, Ownable {
     using Strings for uint256;
@@ -15,7 +17,8 @@ contract VideoNFTContract is ERC721, Ownable {
     
     uint8 constant tokensPerEdition = 25;
     uint256 quantPeriod;
-    uint256 rewardPerQuant;  
+    uint256 rewardPerQuant;
+    uint256 priceUpdateTime;  
 
     struct Ownership {
         address owner;
@@ -32,6 +35,9 @@ contract VideoNFTContract is ERC721, Ownable {
         uint256[tokensPerEdition] tokens;
         uint256 triggerMomentTimestamp;
         uint256 lastUpdateTimestamp;
+        uint256 auctionTime;
+        uint256 startPrice;
+        uint256 endPrice;
     }
     
     MalevichToken rewardToken;
@@ -44,17 +50,47 @@ contract VideoNFTContract is ERC721, Ownable {
     mapping(uint256 => string) private _tokenURIs;
     mapping(uint256 => address) private _tokenApprovals;
 
-    event CreateEdition(uint256 editionId, uint256 triggerMomentTimestamp);
-    event EditEdition(uint256 editionId, uint256 triggerMomentTimestamp);
+    event CreateEdition(uint256 editionId, uint256 triggerMomentTimestamp, uint256 auctionTime, uint256 startPrice, uint256 endPrice);
+    event EditEdition(uint256 editionId, uint256 triggerMomentTimestamp, uint256 auctionTime, uint256 startPrice, uint256 endPrice);
     event BuyToken(uint256 tokenId, address purchaser);
 
-    constructor(address tokenAddress, uint256 _quantPeriod, uint256 _rewardPerQuant) public ERC721("VideoNFTContract", "VNFT") {
+    constructor(
+        address tokenAddress, 
+        uint256 _quantPeriod, 
+        uint256 _rewardPerQuant,
+        uint256 _priceUpdateTime
+    ) ERC721("VideoNFTContract", "VNFT") {
         require(tokenAddress != address(0), "VideoNFTContract: address must not be empty");
         rewardToken = MalevichToken(tokenAddress);
         quantPeriod = _quantPeriod;
         rewardPerQuant = _rewardPerQuant;
+        priceUpdateTime = _priceUpdateTime;
     }
 
+    function getQuantPeriod() public view returns (uint256) {
+        return quantPeriod;
+    }
+
+    function setQuantPeriod(uint256 _quantPeriod) public onlyOwner {
+        quantPeriod = _quantPeriod;
+    }
+
+    function getRewardPerQuant() public view returns (uint256) {
+        return rewardPerQuant;
+    }
+
+    function setRewardPerQuant(uint256 _rewardPerQuant) public onlyOwner {
+        rewardPerQuant = _rewardPerQuant;
+    }    
+    
+    function getPriceUpdateTime() public view returns(uint256){
+        return priceUpdateTime;
+    }
+
+    
+    function setPriceUpdateTime(uint256 _priceUpdateTime) public onlyOwner {
+        priceUpdateTime = _priceUpdateTime;
+    } 
 
     function balanceOf(address owner) public view override returns (uint256) {
         require(owner != address(0), "VideoNFTContract: balance query for the zero address");
@@ -81,18 +117,16 @@ contract VideoNFTContract is ERC721, Ownable {
 
     function getApproved(uint256 tokenId) public view override returns (address) {
         require(_exists(tokenId), "VideoNFTContract: approved query for nonexistent token");
-
         return _tokenApprovals[tokenId];
     }
 
-    function mintToken(string memory tokenURI, uint256 auctionStartTimestamp) public onlyOwner returns (uint256) {
-        //console.log("block.timestamp: ", block.timestamp);
+    function mintToken(string memory _tokenURI, uint256 auctionStartTimestamp) public onlyOwner returns (uint256) {
         require(auctionStartTimestamp > block.timestamp, "VideoNFTContract: timestamp cannot be less than the current time");
         _tokenIds.increment();
 
         uint256 newTokenId = _tokenIds.current();
         _mint(address(this), newTokenId);
-        _setTokenURI(newTokenId, tokenURI);
+        _setTokenURI(newTokenId, _tokenURI);
         _setAuctionStartTimestamp(newTokenId, auctionStartTimestamp);
         
         return _tokenIds.current();
@@ -100,18 +134,15 @@ contract VideoNFTContract is ERC721, Ownable {
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_exists(tokenId), "VideoNFTContract: URI query for nonexistent token");
-
         string memory _tokenURI = _tokenURIs[tokenId];
-
         if (bytes(_tokenURI).length > 0) {
             return _tokenURI;
         }
-
         return _baseURI();
     }
 
-    function setTokenURI(uint256 tokenId, string memory tokenURI) public onlyOwner {
-        _setTokenURI(tokenId, tokenURI);
+    function setTokenURI(uint256 tokenId, string memory _tokenURI) public onlyOwner {
+        _setTokenURI(tokenId, _tokenURI);
     }
 
     function getAuctionStartTimestamp(uint256 tokenId) public view returns (uint256) {
@@ -124,22 +155,46 @@ contract VideoNFTContract is ERC721, Ownable {
 
     function getTokenPrice(uint256 tokenId) public view returns (uint256) {
         require(block.timestamp > getAuctionStartTimestamp(tokenId), "VideoNFTContract: auction has not started");
-        
-        uint256 timestamp = 0;
-        if (block.timestamp - getAuctionStartTimestamp(tokenId) < 2 hours){
-            timestamp = 2 hours - (block.timestamp - getAuctionStartTimestamp(tokenId));
-        }
-        timestamp = timestamp - (timestamp % 10 minutes); 
+        (uint256 editionId,) = editionByToken(tokenId);
 
-        //console.log("timestamp: ", timestamp);
+        uint256 auctionTime = getAuctionTime(editionId);
+        uint256 startPrice = getStartPrice(editionId);
+        uint256 endPrice = getEndPrice(editionId);
+                
+        if (block.timestamp - getAuctionStartTimestamp(tokenId) == auctionTime){
+            return startPrice;
+        }     
+
+        if (block.timestamp - getAuctionStartTimestamp(tokenId) > auctionTime){
+            return endPrice;
+        } 
         
-        if (timestamp > 40 minutes) {
-            return 25 * 10**14 * timestamp / 3 - 10**18;
-        } else  if (timestamp > 10 minutes) {
-            return 125 * 10**13 * timestamp / 3;
+        uint256 timestamp = auctionTime - (block.timestamp - getAuctionStartTimestamp(tokenId));
+                
+        timestamp = timestamp - (timestamp % priceUpdateTime); 
+
+        uint256 beginTime;
+        uint256 beginPrice;
+        uint256 lastTime;
+        uint256 lastPrice;
+        if (timestamp > auctionTime / 3) {
+            beginTime = auctionTime;
+            beginPrice = startPrice;
+            lastTime = auctionTime / 3;
+            lastPrice = startPrice * 15 / 100;
+        } else  if (timestamp > auctionTime / 12) {
+            beginTime = auctionTime / 3;
+            beginPrice = startPrice * 15 / 100;
+            lastTime = auctionTime / 12;
+            lastPrice = startPrice * 15 / 300;
         } else {
-            return 85 * 10**13 * timestamp / 3 + 8 * 10**16;
+            beginTime = auctionTime / 12;
+            beginPrice = startPrice * 15 / 300;
+            lastTime = 0;
+            lastPrice = endPrice;
         }       
+        //linear function
+        return ((beginPrice - lastPrice) * timestamp + beginTime * lastPrice - lastTime * beginPrice) / (beginTime - lastTime);
     }
 
     function buyToken(uint256 tokenId) public payable returns (bool) {
@@ -147,6 +202,7 @@ contract VideoNFTContract is ERC721, Ownable {
         uint256 tokenPrice = getTokenPrice(tokenId);
         
         require (msg.value == tokenPrice, "VideoNFTContract: insufficient funds");
+        
         
         _transfer(address(this), _msgSender(), tokenId);
         _owners[tokenId].ownershipStartTime = block.timestamp;
@@ -156,57 +212,111 @@ contract VideoNFTContract is ERC721, Ownable {
         return true;
     }
 
-    function createEdition(uint256[tokensPerEdition] memory _tokens, uint256 _triggerMomentTimestamp) public onlyOwner returns (uint256) {
-        require(_triggerMomentTimestamp > block.timestamp, "VideoNFTContract: timestamp cannot be less than the current time");
-        _checkVideoNFTs(_tokens);
+    function createEdition(
+        uint256[tokensPerEdition] memory tokens, 
+        uint256 triggerMomentTimestamp, 
+        uint256 auctionTime, 
+        uint256 startPrice, 
+        uint256 endPrice
+    ) public onlyOwner returns (uint256) {
+        require(triggerMomentTimestamp > block.timestamp, "VideoNFTContract: timestamp cannot be less than the current time");
+        _checkVideoNFTs(tokens);
         
         _editionIds.increment();
         uint256 newEditionId = _editionIds.current();
         
-        _editions[newEditionId].tokens = _tokens;
-        _editions[newEditionId].triggerMomentTimestamp = _triggerMomentTimestamp;
+        _editions[newEditionId].tokens = tokens;
+        _editions[newEditionId].triggerMomentTimestamp = triggerMomentTimestamp;
         _editions[newEditionId].lastUpdateTimestamp = block.timestamp;
+        _editions[newEditionId].auctionTime = auctionTime;
+        _editions[newEditionId].startPrice = startPrice;
+        _editions[newEditionId].endPrice = endPrice;
 
-        emit CreateEdition(newEditionId,  _triggerMomentTimestamp);
+        emit CreateEdition(newEditionId, triggerMomentTimestamp, auctionTime, startPrice, endPrice);
 
         return newEditionId;
     }
 
-    function editEdition(uint256 _editionId, uint256[tokensPerEdition] memory _tokens, uint256 _triggerMomentTimestamp) public onlyOwner returns (uint256) {
-        require(_triggerMomentTimestamp > block.timestamp, "VideoNFTContract: timestamp cannot be less than the current time");
-        
-        _checkVideoNFTs(_tokens);
+    function editEdition(
+        uint256 editionId,
+        uint256[tokensPerEdition] memory tokens, 
+        uint256 triggerMomentTimestamp, 
+        uint256 auctionTime, 
+        uint256 startPrice, 
+        uint256 endPrice
+    ) public onlyOwner {
+        require(triggerMomentTimestamp > block.timestamp, "VideoNFTContract: timestamp cannot be less than the current time");
+        _checkVideoNFTs(tokens);
               
-        _editions[_editionId].tokens = _tokens;
-        _editions[_editionId].triggerMomentTimestamp = _triggerMomentTimestamp;
-        _editions[_editionId].lastUpdateTimestamp = block.timestamp;
+        _editions[editionId].tokens = tokens;
+        _editions[editionId].triggerMomentTimestamp = triggerMomentTimestamp;
+        _editions[editionId].lastUpdateTimestamp = block.timestamp;
+        _editions[editionId].auctionTime = auctionTime;
+        _editions[editionId].startPrice = startPrice;
+        _editions[editionId].endPrice = endPrice;
 
-        emit EditEdition(_editionId,  _triggerMomentTimestamp);
-
-        return _editionId;
+        emit EditEdition(editionId, triggerMomentTimestamp, auctionTime, startPrice, endPrice);
     }
 
-    function updateTriggerTime(uint256 editionsId, uint256 _triggerMomentTimestamp) public onlyOwner {
-        require(_triggerMomentTimestamp > block.timestamp, "VideoNFTContract: timestamp cannot be less than the current time");
-        _editions[editionsId].triggerMomentTimestamp = _triggerMomentTimestamp;
-        _editions[editionsId].lastUpdateTimestamp = block.timestamp;
+    function setTriggerTime(uint256 editionId, uint256 triggerMomentTimestamp) public onlyOwner {
+        require(triggerMomentTimestamp > block.timestamp, "VideoNFTContract: timestamp cannot be less than the current time");
+        _editions[editionId].triggerMomentTimestamp = triggerMomentTimestamp;
+        _editions[editionId].lastUpdateTimestamp = block.timestamp;
     }
 
-    function isEditionSold(uint256 editionsId) public view returns (bool) {
+    function getTriggerTime(uint256 editionId) public view returns(uint256) {
+        return _editions[editionId].triggerMomentTimestamp;
+    }
+
+    function getLastTriggerTime(uint256 editionId) public view returns(uint256) {
+        return _editions[editionId].lastUpdateTimestamp;
+    }
+
+    function setAuctionTime(uint256 editionId, uint256 auctionTime) public onlyOwner{
+        _setAuctionTime(editionId, auctionTime);
+    }
+
+    function getAuctionTime(uint256 editionId) public view returns (uint256){
+        return _editions[editionId].auctionTime;
+    }
+
+    function setStartPrice(uint256 editionId, uint256 startPrice) public onlyOwner{
+        _setStartPrice(editionId, startPrice);
+    }
+
+    function getStartPrice(uint256 editionId) public view returns (uint256){
+        return _editions[editionId].startPrice;
+    }
+
+    function setEndPrice(uint256 editionId, uint256 endPrice) public onlyOwner{
+        _setEndPrice(editionId, endPrice);
+    }
+
+    function getEndPrice(uint256 editionId) public view returns (uint256){
+        return _editions[editionId].endPrice;
+    } 
+
+    function isEditionSold(uint256 editionId) public view returns (bool) {
         for (uint256 counter = 0; counter < tokensPerEdition; counter++){
-            if (!isVideoNFTSold(_editions[editionsId].tokens[counter])) return false;
+            if (!isVideoNFTSold(_editions[editionId].tokens[counter])) return false;
         }
         return true;
     }
 
-    function getEdition(uint256 editionsId) public view returns (
-        uint256[tokensPerEdition] memory _tokens, 
-        uint256 _triggerMomentTimestamp, 
-        uint256 _lastUpdateTimestamp
+    function getEdition(uint256 editionId) public view returns (
+        uint256[tokensPerEdition] memory tokens, 
+        uint256 triggerMomentTimestamp,
+        uint256 lastUpdateTimestamp, 
+        uint256 auctionTime, 
+        uint256 startPrice, 
+        uint256 endPrice
     ){
-        _tokens = _editions[editionsId].tokens;
-        _triggerMomentTimestamp = _editions[editionsId].triggerMomentTimestamp;
-        _lastUpdateTimestamp = _editions[editionsId].lastUpdateTimestamp;
+        tokens = _editions[editionId].tokens;
+        triggerMomentTimestamp = _editions[editionId].triggerMomentTimestamp;
+        lastUpdateTimestamp = _editions[editionId].lastUpdateTimestamp;
+        auctionTime = _editions[editionId].auctionTime;
+        startPrice = _editions[editionId].startPrice;
+        endPrice = _editions[editionId].endPrice;
     }
 
     
@@ -271,22 +381,6 @@ contract VideoNFTContract is ERC721, Ownable {
     function isVideoNFTSold(uint256 tokenId) public view returns (bool) {
         if (_owners[tokenId].ownershipStartTime != 0) return true;
         return false;
-    }
-
-    function getQuantPeriod() public view returns (uint256) {
-        return quantPeriod;
-    }
-
-    function setQuantPeriod(uint256 _quantPeriod) public onlyOwner {
-        quantPeriod = _quantPeriod;
-    }
-
-    function getRewardPerQuant() public view returns (uint256) {
-        return rewardPerQuant;
-    }
-
-    function setRewardPerQuant(uint256 _rewardPerQuant) public onlyOwner {
-        rewardPerQuant = _rewardPerQuant;
     }
 
     function transfer(address recipient, uint256 amount) public returns (bool) {
@@ -376,7 +470,24 @@ contract VideoNFTContract is ERC721, Ownable {
         uint256 tokenId
     ) internal override {
         if (from == address(0) || to == address(0)) return;
-        _ownersReward[from].rewardStored = _ownersReward[from].rewardStored + rewardPerQuant * ((block.timestamp - _owners[tokenId].ownershipStartTime) / quantPeriod); 
+        _ownersReward[from].rewardStored = _ownersReward[from].rewardStored + rewardPerQuant * 
+                                            ((block.timestamp - _owners[tokenId].ownershipStartTime) / quantPeriod); 
+    }
+
+    function _setAuctionTime(uint256 editionId, uint256 auctionTime) private {
+        _editions[editionId].auctionTime = auctionTime;
+    }
+
+    function _setStartPrice(uint256 editionId, uint256 startPrice) private {
+        _editions[editionId].startPrice = startPrice;
+    }
+
+    function _setEndPrice(uint256 editionId, uint256 endPrice) private {
+        _editions[editionId].endPrice = endPrice;
+    }
+
+    function withdrawETH(address payable recipient, uint256 amount) public onlyOwner {
+        recipient.transfer(amount);
     }
 }
 
