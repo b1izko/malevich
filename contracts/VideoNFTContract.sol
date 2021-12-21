@@ -7,10 +7,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./MalevichToken.sol";
 
 
-// For debugging only
-import "hardhat/console.sol";
-
-
 contract VideoNFTContract is ERC721, Ownable {
     using Strings for uint256;
     using Counters for Counters.Counter;
